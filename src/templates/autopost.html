@@ -1,0 +1,12 @@
+<html>
+    <body>
+        <form id="autoPostForm" action="{{.Action}}" method="post">
+            {{range $key, $value := .Params}}
+                <input type="hidden" name="{{$key}}" value="{{$value}}">
+            {{end}}
+        </form>
+        <script>
+            document.getElementById('autoPostForm').submit();
+        </script>
+    </body>
+</html>

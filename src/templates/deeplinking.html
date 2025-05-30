@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+    </head>
+    <body>
+        <div class="modal position-static d-block">
+            <div class="modal-dialog" style="max-width: 80%">
+              <div class="modal-content">
+                <div class="modal-header">
+                    <h1>Deep Link</h1>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Settings go here.
+                    </p>
+                    <form action="/lti/deeplink/return" method="POST" >
+                        <input type="hidden" name="iss" value="{{.Issuer}}"/>
+                        <input type="hidden" name="aud" value="{{.ClientId}}"/>
+                        <input type="hidden" name="deployment_id" value="{{.DeploymentId}}"/>
+                        <input type="hidden" name="data" value="{{.Data}}"/>
+                        <input type="hidden" name="response_url" value="{{.DlReturnUrl}}"/>
+                        <input type="hidden" name="content_item_type" value="{{.ContentItemType}}"/>
+                        <input class="btn btn-primary" type="submit" value="Create {{.ContentItemType}}"/>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+
+</html>
