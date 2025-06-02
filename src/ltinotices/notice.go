@@ -75,8 +75,7 @@ func BatchHandler(w http.ResponseWriter, r *http.Request) {
 
 func handler(w http.ResponseWriter, r *http.Request, idToken string) utils.JsonErrors {
 	errs, c := oidc.Validator().ValidateIdToken(idToken, &LtiNotice{})
-	claims := c.(*LtiNotice)
-	if len(errs.Errors) > 0 {
+	if len(errs.Errors) > 0 || c == nil {
 		// Log all errors
 		for _, err := range errs.Errors {
 			log.Print(err)
@@ -84,6 +83,7 @@ func handler(w http.ResponseWriter, r *http.Request, idToken string) utils.JsonE
 		return errs
 	}
 	// Switch on message type
+	claims := c.(*LtiNotice)
 	switch claims.Notice.Type {
 	case "LtiAssetProcessorSubmissionNotice":
 		// Handle asset processor submission notice

@@ -6,12 +6,12 @@ services:
     volumes:
       - ./llm:/models
     environment:
-      # alternatively, you can use "LLAMA_ARG_MODEL_URL" to download the model
       LLAMA_ARG_MODEL: /models/Llama-3.2-3B-Instruct-Q6_K.gguf
       LLAMA_ARG_CTX_SIZE: 4096
       LLAMA_ARG_N_PARALLEL: 2
       LLAMA_ARG_ENDPOINT_METRICS: 1
       LLAMA_ARG_PORT: 8080
+
   ap-server:
     build: .
     image: ap-server
@@ -41,3 +41,17 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
       - LOG_LEVEL=DEBUG
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - "http"
+      - "--url"
+      - "https://${NGROK_DOMAIN:-lti-asset-processor-${USER:-default}}.ngrok.io"
+      - "--authtoken"
+      - "${NGROK_AUTH}"
+      - "--log"
+      - "stdout"
+      - "ap-server:8000"
+    ports:
+      - 40040:4040

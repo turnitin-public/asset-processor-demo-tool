@@ -2,3 +2,4 @@ llm/*
 ml/*
 ngrok-auth.yml
 db/zdata.sql
+.env

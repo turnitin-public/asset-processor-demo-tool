@@ -74,12 +74,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	case "LtiAssetProcessorSettingsRequest":
 		// Handle asset processor settings request
 		errs = assetProcessorSettingsRequest(w, r, claims)
-	case "LtiReportReviewRequest":
-		// Handle report review request
-		errs = reportReviewRequest(w, r, claims)
 	case "LtiEulaRequest":
 		// Handle EULA request
 		errs = eulaRequest(w, r, claims)
+	case "LtiReportReviewRequest":
+		// Handle report review request
+		errs = reportReviewRequest(w, r, claims)
+	default:
+		utils.UiError(w, 501, "Message type not yet implemented")
 	}
 
 	if len(errs.Errors) > 0 {
