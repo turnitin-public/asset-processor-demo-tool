@@ -34,6 +34,24 @@ func UiError(w http.ResponseWriter, s int, e string) {
 	}
 }
 
+// TemplateLoader handles loading and executing templates with proper error handling
+func TemplateLoader(templateName string, data any, w http.ResponseWriter, errs *JsonErrors) *JsonErrors {
+	t, err := template.ParseFiles(templateName)
+	if err != nil {
+		AddError(errs, "Unable to load template", err)
+		errs.Code = 500
+		return errs
+	}
+
+	if err := t.Execute(w, data); err != nil {
+		AddError(errs, "Unable to render template", err)
+		errs.Code = 500
+		return errs
+	}
+
+	return errs
+}
+
 // A JsonError represents a single error with a message.
 // The message should be suitable to display to the end user.
 type JsonError struct {

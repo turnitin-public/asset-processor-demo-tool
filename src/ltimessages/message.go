@@ -9,46 +9,73 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
+// ContextClaim represents the context claim structure
+type ContextClaim struct {
+	Id string `json:"id,omitempty"`
+}
+
+// AssetClaim represents the asset claim structure
+type AssetClaim struct {
+	Id string `json:"id,omitempty"`
+}
+
+// SubmissionClaim represents the submission claim structure
+type SubmissionClaim struct {
+	Id string `json:"id,omitempty"`
+}
+
+// ForUserClaim represents the for_user claim structure
+type ForUserClaim struct {
+	UserId string `json:"user_id,omitempty"`
+}
+
+// ActivityClaim represents the activity claim structure
+type ActivityClaim struct {
+	Id    string `json:"id,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+// ResourceLinkClaim represents the resource_link claim structure
+type ResourceLinkClaim struct {
+	Id    string `json:"id,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+// DeepLinkingSettingsClaim represents the deep_linking_settings claim structure
+type DeepLinkingSettingsClaim struct {
+	Data              *string  `json:"data,omitempty"`
+	DeepLinkReturnUrl string   `json:"deep_link_return_url,omitempty"`
+	AcceptTypes       []string `json:"accept_types,omitempty"`
+}
+
+// PlatformNotificationServiceClaim represents the platform_notification_service claim structure
+type PlatformNotificationServiceClaim struct {
+	ServiceUrl           string   `json:"platform_notification_service_url,omitempty"`
+	NoticeTypesSupported []string `json:"notice_types_supported,omitempty"`
+}
+
+// EulaServiceClaim represents the eulaservice claim structure
+type EulaServiceClaim struct {
+	Url   string   `json:"url,omitempty"`
+	Scope []string `json:"scope,omitempty"`
+}
+
 type LtiMessage struct {
-	MessageType  string `json:"https://purl.imsglobal.org/spec/lti/claim/message_type,omitempty"`
-	DeploymentId string `json:"https://purl.imsglobal.org/spec/lti/claim/deployment_id,omitempty"`
-	Context      *struct {
-		Id string `json:"id,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/context,omitempty"`
-	Asset *struct {
-		Id string `json:"id,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/asset,omitempty"`
-	ReportType string `json:"https://purl.imsglobal.org/spec/lti/claim/assetreport_type"`
-	Submission *struct {
-		Id string `json:"id,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/submission,omitempty"`
-	ForUser *struct {
-		UserId string `json:"user_id,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/for_user,omitempty"`
-	Activity *struct {
-		Id    string `json:"id,omitempty"`
-		Title string `json:"title,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/activity,omitempty"`
-	ResourceLink *struct {
-		Id    string `json:"id,omitempty"`
-		Title string `json:"title,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/resource_link,omitempty"`
-	Roles []string `json:"https://purl.imsglobal.org/spec/lti/claim/roles,omitempty"`
-	Dl    *struct {
-		Data              *string  `json:"data,omitempty"`
-		DeepLinkReturnUrl string   `json:"deep_link_return_url,omitempty"`
-		AcceptTypes       []string `json:"accept_types,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings,omitempty"`
-	Pns *struct {
-		ServiceUrl           string   `json:"platform_notification_service_url,omitempty"`
-		NoticeTypesSupported []string `json:"notice_types_supported,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/platformnotificationservice,omitempty"`
-	Eula *struct {
-		Url   string   `json:"url,omitempty"`
-		Scope []string `json:"scope,omitempty"`
-	} `json:"https://purl.imsglobal.org/spec/lti/claim/eulaservice,omitempty"`
-	TargetLinkUri string `json:"https://purl.imsglobal.org/spec/lti/claim/target_link_uri,omitempty"`
-	Nonce         string `json:"nonce,omitempty"`
+	MessageType   string                            `json:"https://purl.imsglobal.org/spec/lti/claim/message_type,omitempty"`
+	DeploymentId  string                            `json:"https://purl.imsglobal.org/spec/lti/claim/deployment_id,omitempty"`
+	Context       *ContextClaim                     `json:"https://purl.imsglobal.org/spec/lti/claim/context,omitempty"`
+	Asset         *AssetClaim                       `json:"https://purl.imsglobal.org/spec/lti/claim/asset,omitempty"`
+	ReportType    string                            `json:"https://purl.imsglobal.org/spec/lti/claim/assetreport_type"`
+	Submission    *SubmissionClaim                  `json:"https://purl.imsglobal.org/spec/lti/claim/submission,omitempty"`
+	ForUser       *ForUserClaim                     `json:"https://purl.imsglobal.org/spec/lti/claim/for_user,omitempty"`
+	Activity      *ActivityClaim                    `json:"https://purl.imsglobal.org/spec/lti/claim/activity,omitempty"`
+	ResourceLink  *ResourceLinkClaim                `json:"https://purl.imsglobal.org/spec/lti/claim/resource_link,omitempty"`
+	Roles         []string                          `json:"https://purl.imsglobal.org/spec/lti/claim/roles,omitempty"`
+	Dl            *DeepLinkingSettingsClaim         `json:"https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings,omitempty"`
+	Pns           *PlatformNotificationServiceClaim `json:"https://purl.imsglobal.org/spec/lti/claim/platformnotificationservice,omitempty"`
+	Eula          *EulaServiceClaim                 `json:"https://purl.imsglobal.org/spec/lti/claim/eulaservice,omitempty"`
+	TargetLinkUri string                            `json:"https://purl.imsglobal.org/spec/lti/claim/target_link_uri,omitempty"`
+	Nonce         string                            `json:"nonce,omitempty"`
 	jwt.StandardClaims
 }
 

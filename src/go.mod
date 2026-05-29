@@ -1,6 +1,6 @@
 module 1edtech/ap-demo
 
-go 1.23
+go 1.22
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d // indirect

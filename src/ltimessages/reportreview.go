@@ -22,13 +22,6 @@ func reportReviewRequest(w http.ResponseWriter, r *http.Request, claims *LtiMess
 	if err != nil {
 		fileEmbed = "Unable to load report"
 	}
-	// Load Template
-	t, err := template.ParseFiles("templates/report.html")
-	if err != nil {
-		utils.AddError(&errs, "Unable to load template", err)
-		errs.Code = 500
-		return errs
-	}
 	data := struct {
 		Report    string
 		AssetId   string
@@ -38,11 +31,7 @@ func reportReviewRequest(w http.ResponseWriter, r *http.Request, claims *LtiMess
 		AssetId:   claims.Asset.Id,
 		FileEmbed: fileEmbed,
 	}
-	err = t.Execute(w, data)
-	if err != nil {
-		utils.AddError(&errs, "Unable to render template", err)
-		errs.Code = 500
-	}
+	utils.TemplateLoader("templates/report.html", data, w, &errs)
 
 	return errs
 }

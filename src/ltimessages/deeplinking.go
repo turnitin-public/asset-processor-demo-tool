@@ -4,7 +4,6 @@ import (
 	"1edtech/ap-demo/datastore"
 	"1edtech/ap-demo/ltiservices"
 	"1edtech/ap-demo/utils"
-	"html/template"
 	"net/http"
 	"time"
 
@@ -17,13 +16,6 @@ func deepLinkingRequest(w http.ResponseWriter, r *http.Request, claims *LtiMessa
 	var errs = utils.JsonErrors{Errors: make([]utils.JsonError, 0), Code: 200}
 	ltiservices.RegisterSubmissionNotice(claims.Issuer, claims.Audience, claims.DeploymentId, claims.Pns.ServiceUrl, []string{"https://purl.imsglobal.org/spec/lti/scope/noticehandlers"}, &errs)
 	if len(errs.Errors) > 0 {
-		return errs
-	}
-	// Load Template
-	t, err := template.ParseFiles("templates/deeplinking.html")
-	if err != nil {
-		utils.AddError(&errs, "Unable to load template", err)
-		errs.Code = 500
 		return errs
 	}
 
@@ -54,11 +46,7 @@ func deepLinkingRequest(w http.ResponseWriter, r *http.Request, claims *LtiMessa
 		Data:            claims.Dl.Data,
 		ContentItemType: acceptType,
 	}
-	err = t.Execute(w, data)
-	if err != nil {
-		utils.AddError(&errs, "Unable to render template", err)
-		errs.Code = 500
-	}
+	utils.TemplateLoader("templates/deeplinking.html", data, w, &errs)
 
 	return errs
 }
@@ -183,13 +171,10 @@ func DeepLinkingResponse(w http.ResponseWriter, r *http.Request) {
 		Action: deepLinkResponseData.ResponseUrl,
 		Params: map[string]string{"JWT": signedDlJwt},
 	}
-	te, err := template.ParseFiles("templates/autopost.html")
-	if err != nil {
-		utils.AddError(&errs, "Failed to parse template", err)
-		errs.Code = 500
+	utils.TemplateLoader("templates/autopost.html", data, w, &errs)
+	if len(errs.Errors) > 0 {
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
-	te.Execute(w, data)
 
 }

@@ -30,6 +30,16 @@ services:
     depends_on:
       - postgres
 
+  mcp-server:
+    build: ./mcp
+    image: mcp-server
+    ports:
+      - 8802:8802
+    environment:
+      - LLM_SERVER_URL=http://llamacpp-server:8080
+    depends_on:
+      - llamacpp-server
+
   postgres:
     image: postgres:9.6.6
     volumes:
@@ -42,16 +52,6 @@ services:
       - POSTGRES_DB=postgres
       - LOG_LEVEL=DEBUG
 
-  ngrok:
-    image: ngrok/ngrok:latest
-    command:
-      - "http"
-      - "--url"
-      - "https://${NGROK_DOMAIN:-lti-asset-processor-${USER:-default}}.ngrok.io"
-      - "--authtoken"
-      - "${NGROK_AUTH}"
-      - "--log"
-      - "stdout"
-      - "ap-server:8000"
-    ports:
-      - 40040:4040
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://ap-server:8000
