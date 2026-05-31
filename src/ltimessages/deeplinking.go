@@ -14,9 +14,14 @@ import (
 func deepLinkingRequest(w http.ResponseWriter, r *http.Request, claims *LtiMessage) utils.JsonErrors {
 	// Register for submission notices
 	var errs = utils.JsonErrors{Errors: make([]utils.JsonError, 0), Code: 200}
-	ltiservices.RegisterSubmissionNotice(claims.Issuer, claims.Audience, claims.DeploymentId, claims.Pns.ServiceUrl, []string{"https://purl.imsglobal.org/spec/lti/scope/noticehandlers"}, &errs)
-	if len(errs.Errors) > 0 {
-		return errs
+	if claims.Pns != nil {
+		ltiservices.RegisterSubmissionNotice(claims.Issuer, claims.Audience, claims.DeploymentId, claims.Pns.ServiceUrl, []string{"https://purl.imsglobal.org/spec/lti/scope/noticehandlers"}, &errs)
+		if len(errs.Errors) > 0 {
+			return errs
+		}
+	} else {
+		// PNS not configured, add a warning but continue
+		utils.AddError(&errs, "Platform Notification Service not configured", nil)
 	}
 
 	// Get first supported accept type

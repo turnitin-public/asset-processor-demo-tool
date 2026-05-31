@@ -138,8 +138,6 @@ func getProcessors() []IProcessor {
 	if processors == nil {
 		processors = []IProcessor{
 			textCountProcessor,
-			textProcessor,
-			imageProcessor,
 		}
 	}
 	return processors

@@ -11,5 +11,7 @@ COPY ./src .
 RUN go mod vendor -v
 RUN go get -d -v ./...
 RUN go install -v ./...
+COPY ./init.sh .
+RUN chmod +x init.sh
 
-CMD ["bash", "-c", "go run *.go"]
+CMD ["bash", "-c", "./init.sh"]

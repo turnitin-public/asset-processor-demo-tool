@@ -85,7 +85,7 @@ func GetClientServiceToken(issuer string, clientId string, deploymentId string, 
 		return nil, false
 	}
 
-	log.Printf("%+v", string(accessTokenRespString))
+	log.Printf("Access token response: %+v", string(accessTokenRespString))
 
 	var accessTokenResp AccessTokenResp
 

@@ -5,7 +5,6 @@ import (
 	"1edtech/ap-demo/ltimessages"
 	"1edtech/ap-demo/ltinotices"
 	"1edtech/ap-demo/oidc"
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -29,21 +28,7 @@ func main() {
 	// Deep Linking Response
 	mux.Handle("/lti/deeplink/return", http.HandlerFunc(ltimessages.DeepLinkingResponse))
 
-	// http call Test
-	mux.Handle("/client", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, _ := http.NewRequest("POST", os.Getenv("LLM_SERVER_URL")+"/completion", bytes.NewBuffer([]byte(`{"prompt":"write me a story about cheese rolling down a hill."}`)))
-		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			w.WriteHeader(500)
-			fmt.Fprint(w, "Failed to make request: "+err.Error())
-			return
-		}
-		w.WriteHeader(200)
-		resp.Write(w)
-		//fmt.Fprint(w, "called")
-	}))
+	fmt.Printf("Tunnel URL: %s\n", os.Getenv("TUNNEL_URL"))
 
 	datastore.DBInit()
 
@@ -55,7 +40,10 @@ func main() {
 		ReadHeaderTimeout: 0,
 		Handler:           mux,
 	}
-	// Start server
-	fmt.Println("Starting...")
-	log.Fatal(srv.ListenAndServe())
+	// Start server with HTTPS
+	// Replace with your certificate files
+	// For development, you can generate self-signed certs with:
+	// openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+	fmt.Println("Starting HTTPS server...")
+	log.Fatal(srv.ListenAndServeTLS("cert.pem", "key.pem"))
 }

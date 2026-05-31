@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"math"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -27,7 +28,7 @@ func (textCountProcessorType) GetType() string {
 
 func (textCountProcessorType) CanBeUsed(asset ltiservices.Asset) bool {
 	// Check if the asset is a text file
-	return asset.ContentType == "text/plain"
+	return asset.ContentType == "text/plain" || asset.ContentType == "text/html"
 }
 
 func (textCountProcessorType) Process(registrationId string, deploymentId string, asset ltiservices.DownloadedAsset, errs *utils.JsonErrors) (bool, *ltiservices.Report) {
@@ -37,6 +38,9 @@ func (textCountProcessorType) Process(registrationId string, deploymentId string
 		errs.Code = 401
 		return false, nil
 	}
+	// Strip html tags and replace one or morewhitespace characters with single spaces
+	re := regexp.MustCompile(`\s+`)
+	assetFile = []byte(template.HTMLEscapeString(re.ReplaceAllString(string(assetFile), " ")))
 	given := float64(len(strings.Split(string(assetFile), " ")))
 	msg := fmt.Sprintf("The word count is: %d", int(given))
 	ok := datastore.AssetReportQueries.SaveAssetReport(asset.Id, registrationId, deploymentId, asset.Asset.Id, "textCount", msg)
@@ -49,7 +53,7 @@ func (textCountProcessorType) Process(registrationId string, deploymentId string
 		AssetId:            asset.Asset.Id,
 		Type:               "textCount",
 		Timestamp:          time.Now().Format(time.RFC3339),
-		Title:              asset.Asset.Title,
+		Title:              "word count " + asset.Asset.Title,
 		Result:             fmt.Sprintf("%d words", int(given)),
 		IndicationColor:    fmt.Sprintf("#0000%02x", int(math.Min(given*40, 255))),
 		IndicationAlt:      "Good",

@@ -1,22 +1,7 @@
 services:
-  llamacpp-server:
-    image: ghcr.io/ggml-org/llama.cpp:server
-    ports:
-      - 8080:8080
-    volumes:
-      - ./llm:/models
-    environment:
-      LLAMA_ARG_MODEL: /models/Llama-3.2-3B-Instruct-Q6_K.gguf
-      LLAMA_ARG_CTX_SIZE: 4096
-      LLAMA_ARG_N_PARALLEL: 2
-      LLAMA_ARG_ENDPOINT_METRICS: 1
-      LLAMA_ARG_PORT: 8080
-
   ap-server:
     build: .
     image: ap-server
-    volumes:
-      - ./ml:/modules
     ports:
       - ${LTI_SERVER_PORT:-9002}:8000
     environment:
@@ -26,19 +11,11 @@ services:
       - DB_PORT=5432
       - DB_PASSWORD=postgres
       - TOKEN_SECRET=secret
-      - LLM_SERVER_URL=http://llamacpp-server:8080
+    volumes:
+      - fluentd-data:/fluentd/log:ro
     depends_on:
       - postgres
-
-  mcp-server:
-    build: ./mcp
-    image: mcp-server
-    ports:
-      - 8802:8802
-    environment:
-      - LLM_SERVER_URL=http://llamacpp-server:8080
-    depends_on:
-      - llamacpp-server
+      - fluentd
 
   postgres:
     image: postgres:9.6.6
@@ -52,6 +29,29 @@ services:
       - POSTGRES_DB=postgres
       - LOG_LEVEL=DEBUG
 
+  fluentd:
+    image: fluent/fluentd:v1.17
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./fluentd/conf/fluentd.conf:/fluentd/etc/fluentd.conf
+      - fluentd-data:/fluentd/log
+    environment:
+      - FLUENTD_CONF=fluentd.conf
+    entrypoint: >
+      sh -c "rm -f /fluentd/log/* && exec fluentd -c /fluentd/etc/fluentd.conf"
+
   tunnel:
     image: cloudflare/cloudflared:latest
-    command: tunnel --url http://ap-server:8000
+    command: "tunnel --no-tls-verify --url https://ap-server:8000"
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        tag: cloudflared
+    depends_on:
+      - fluentd
+
+volumes:
+  fluentd-data:

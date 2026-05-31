@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 )
 
 func RegisterSubmissionNotice(issuer string, clientId string, deploymentId string, serviceUrl string, scopes []string, errs *utils.JsonErrors) bool {
@@ -17,12 +19,19 @@ func RegisterSubmissionNotice(issuer string, clientId string, deploymentId strin
 	if !ok {
 		return false
 	}
+	tunnelUrl := os.Getenv("TUNNEL_URL")
+	parsedUrl, err := url.Parse(tunnelUrl)
+	if err != nil {
+		utils.AddError(errs, "Error parsing TUNNEL_URL", err)
+		errs.Code = 401
+		return false
+	}
 	pnsRequest := struct {
 		NoticeType string `json:"notice_type"`
 		Handler    string `json:"handler"`
 	}{
 		NoticeType: "LtiAssetProcessorSubmissionNotice",
-		Handler:    "https://lti-ap-demo.ngrok.io/lti/notice",
+		Handler:    "https://li26-ha.cker.dev:2096/lti/notice/" + parsedUrl.Hostname(),
 	}
 	b, err := json.Marshal(pnsRequest)
 	if err != nil {
