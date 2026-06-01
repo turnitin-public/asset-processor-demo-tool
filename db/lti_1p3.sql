@@ -102,9 +102,80 @@ INSERT INTO registration VALUES(
     'https://localhost:9002/lti/launch',
     'd48a53de-021f-46f7-a0a4-7134812c2235'
 );
+35993:1dcbe0e28e0b86ec9ef98134a0ad3e16806e62e5
+35994:16256b8bef8f64c7a2f6d08614573150cbd55bd2
+35995:7ee4927cfbe58059715f694e47e83dc15934cf30
+35996:e29a7133b42614d47e6c1815bb4837645912059c
+35997:7a9f1324c249c2e39bad4197c5f899823b2c964c
+35998:0dae1b84dd3e14923caa85d535de984e561cdd51
+35999:91ebd8b032072cbba5f69606e4da0fff113246b5
+36000:212d4107262c41d4c543cab15c1e22bae1ff1b78
+36001:7c8a1ecfcef2dd0fbab3491fafac8d54660a864b
+36002:d250a8fa86df716d1db1b3f9b62ab2e103715a1a
+
 
 INSERT INTO deployment VALUES(
     '361:c171795ac76afc4b9c7ed8dfc2f97f04741f715f',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35993:1dcbe0e28e0b86ec9ef98134a0ad3e16806e62e5',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35994:16256b8bef8f64c7a2f6d08614573150cbd55bd2',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35995:7ee4927cfbe58059715f694e47e83dc15934cf30',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35996:e29a7133b42614d47e6c1815bb4837645912059c',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35997:7a9f1324c249c2e39bad4197c5f899823b2c964c',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35998:0dae1b84dd3e14923caa85d535de984e561cdd51',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '35999:91ebd8b032072cbba5f69606e4da0fff113246b5',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '36000:212d4107262c41d4c543cab15c1e22bae1ff1b78',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '36001:7c8a1ecfcef2dd0fbab3491fafac8d54660a864b',
+    '18e7ce58-180f-4af0-91a4-e5707265b902',
+    'Example Customer'
+);
+
+INSERT INTO deployment VALUES(
+    '36002:d250a8fa86df716d1db1b3f9b62ab2e103715a1a',
     '18e7ce58-180f-4af0-91a4-e5707265b902',
     'Example Customer'
 );
