@@ -32,6 +32,7 @@ services:
 
   fluentd:
     image: fluent/fluentd:v1.17
+    platform: linux/amd64
     ports:
       - "24224:24224"
       - "24224:24224/udp"
