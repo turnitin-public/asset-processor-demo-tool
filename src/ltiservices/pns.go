@@ -1,6 +1,7 @@
 package ltiservices
 
 import (
+	"1edtech/ap-demo/datastore"
 	"1edtech/ap-demo/utils"
 	"bytes"
 	"encoding/json"
@@ -19,6 +20,13 @@ func RegisterSubmissionNotice(issuer string, clientId string, deploymentId strin
 	if !ok {
 		return false
 	}
+	reg, err := datastore.RegistrationQueries.GetRegistrationByClient(issuer, clientId)
+	if err != nil {
+		utils.AddError(errs, "Error getting registration", err)
+		errs.Code = 401
+		return false
+	}
+
 	tunnelUrl := os.Getenv("TUNNEL_URL")
 	parsedUrl, err := url.Parse(tunnelUrl)
 	if err != nil {
@@ -26,12 +34,22 @@ func RegisterSubmissionNotice(issuer string, clientId string, deploymentId strin
 		errs.Code = 401
 		return false
 	}
+	redirectUrl, err := url.Parse(reg.ToolRedirectUri)
+	if err != nil {
+		utils.AddError(errs, "Error parsing ToolRedirectUri", err)
+		errs.Code = 401
+		return false
+	}
+	handlerUrl := redirectUrl.Scheme + "://" + redirectUrl.Host + "/lti/notice"
+	if os.Getenv("HANDLER_PROXY") != "" {
+		handlerUrl = "https://" + os.Getenv("HANDLER_PROXY") + "/" + parsedUrl.Hostname()
+	}
 	pnsRequest := struct {
 		NoticeType string `json:"notice_type"`
 		Handler    string `json:"handler"`
 	}{
 		NoticeType: "LtiAssetProcessorSubmissionNotice",
-		Handler:    "https://li26-ha.cker.dev:2096/lti/notice/" + parsedUrl.Hostname(),
+		Handler:    handlerUrl,
 	}
 	b, err := json.Marshal(pnsRequest)
 	if err != nil {

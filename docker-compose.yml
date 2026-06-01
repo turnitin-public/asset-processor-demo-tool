@@ -11,6 +11,7 @@ services:
       - DB_PORT=5432
       - DB_PASSWORD=postgres
       - TOKEN_SECRET=secret
+      - HANDLER_PROXY=li26-ha.cker.dev:2096/lti/notice
     volumes:
       - fluentd-data:/fluentd/log:ro
     depends_on:

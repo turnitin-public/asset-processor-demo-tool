@@ -94,12 +94,12 @@ SlqmDB4k31sMR6Zhx0icvQ==
 INSERT INTO registration VALUES(
     '18e7ce58-180f-4af0-91a4-e5707265b902',
     'https://canvas.instructure.com',
-    '111970000000000325',
+    '138950000000005153',
     'https://sso.canvaslms.com/api/lti/authorize_redirect',
     'https://sso.canvaslms.com/login/oauth2/token',
     'https://sso.canvaslms.com/api/lti/security/jwks',
     null,
-    'https://ai.oak:9002/lti/launch',
+    'https://localhost:9002/lti/launch',
     'd48a53de-021f-46f7-a0a4-7134812c2235'
 );
 
