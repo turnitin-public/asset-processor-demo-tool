@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-LOG_FILE="/fluentd/log/tunnel_0.log"
+LOG_FILE="/fluentd/log/tunnel.log"
 MAX_WAIT=30  # seconds
 ELAPSED=0
 
