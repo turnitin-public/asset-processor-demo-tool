@@ -91,8 +91,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	registrationID := uuid.New().String()
 	deploymentID := uuid.New().String()
 	toolBaseURL := resolveToolBaseURL(r)
-	initiateLoginURI := appendQueryValue(toolBaseURL+"/oidc/login", "reg_id", registrationID)
 	toolRedirectURI := toolBaseURL + "/lti/launch"
+	initiateLoginURI := buildLoginURL(toolBaseURL, platformConfig.Issuer, registrationID)
 
 	clientID, ok := registerOnPlatform(platformConfig, payload.RegistrationToken, payload.CustomerID, toolBaseURL, toolRedirectURI, initiateLoginURI, &errs)
 	if !ok {
@@ -364,6 +364,11 @@ func appendQueryValue(rawURL string, key string, value string) string {
 	q.Set(key, value)
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func buildLoginURL(toolBaseURL string, issuer string, registrationID string) string {
+	loginURL := appendQueryValue(toolBaseURL+"/oidc/login", "iss", issuer)
+	return appendQueryValue(loginURL, "reg_id", registrationID)
 }
 
 func isJSONRequest(r *http.Request) bool {
