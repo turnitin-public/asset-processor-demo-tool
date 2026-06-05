@@ -81,8 +81,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isValidConfigURLForIssuer(payload.OpenIDConfiguration, platformConfig.Issuer) {
-		utils.AddError(&errs, "openid_configuration URL must match issuer host", "issuer/config mismatch")
+	if err := validatePlatformConfiguration(payload.OpenIDConfiguration, platformConfig); err != nil {
+		utils.AddError(&errs, err.Error(), err)
 		errs.Code = 400
 		utils.WriteJsonError(w, r, errs)
 		return
@@ -233,25 +233,7 @@ func registerOnPlatform(
 	initiateLoginURI string,
 	errs *utils.JsonErrors,
 ) (string, bool) {
-	toolHost := hostWithoutPort(toolBaseURL)
-	registrationPayload := map[string]interface{}{
-		"application_type":           "web",
-		"grant_types":                []string{"client_credentials", "implicit"},
-		"response_types":             []string{"id_token"},
-		"initiate_login_uri":         initiateLoginURI,
-		"redirect_uris":              []string{toolRedirectURI},
-		"client_name":                resolveToolName(customerID),
-		"jwks_uri":                   toolBaseURL + "/.well-known/jwks.json",
-		"token_endpoint_auth_method": "private_key_jwt",
-		"scope":                      "openid",
-		ltiToolConfigurationClaim: map[string]interface{}{
-			"domain":          toolHost,
-			"target_link_uri": toolRedirectURI,
-			"messages": []map[string]interface{}{
-				{"type": "LtiResourceLinkRequest"},
-			},
-		},
-	}
+	registrationPayload := buildToolRegistrationPayload(customerID, toolBaseURL, toolRedirectURI, initiateLoginURI)
 
 	body, err := json.Marshal(registrationPayload)
 	if err != nil {
@@ -332,27 +314,6 @@ func hostWithoutPort(baseURL string) string {
 		return ""
 	}
 	return u.Hostname()
-}
-
-func isValidConfigURLForIssuer(openIDConfigurationURL string, issuer string) bool {
-	configURL, err := url.Parse(openIDConfigurationURL)
-	if err != nil {
-		return false
-	}
-	issuerURL, err := url.Parse(issuer)
-	if err != nil {
-		return false
-	}
-	if !strings.EqualFold(configURL.Scheme, "https") {
-		return false
-	}
-	if !strings.EqualFold(configURL.Hostname(), issuerURL.Hostname()) {
-		return false
-	}
-	if configURL.Fragment != "" {
-		return false
-	}
-	return true
 }
 
 func appendQueryValue(rawURL string, key string, value string) string {
