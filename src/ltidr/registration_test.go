@@ -79,6 +79,15 @@ func TestBuildToolRegistrationPayload(t *testing.T) {
 		"https://tool.example.com",
 		"https://tool.example.com/lti/launch",
 		"https://tool.example.com/oidc/login?iss=https%3A%2F%2Fplatform.example.com&reg_id=abc",
+		[]string{
+			"sub",
+			"https://purl.imsglobal.org/spec/lti/claim/deployment_id",
+		},
+		[]toolMessageDefinition{
+			{Type: "LtiResourceLinkRequest"},
+			{Type: "LtiDeepLinkingRequest"},
+		},
+		[]string{"openid", "profile", "https://purl.imsglobal.org/spec/lti-ags/scope/score"},
 	)
 
 	if payload.ApplicationType != "web" {
@@ -96,7 +105,7 @@ func TestBuildToolRegistrationPayload(t *testing.T) {
 	if payload.TokenEndpointAuthMethod != "private_key_jwt" {
 		t.Fatalf("unexpected token auth method: %s", payload.TokenEndpointAuthMethod)
 	}
-	if payload.Scope != "openid" {
+	if payload.Scope != "openid profile https://purl.imsglobal.org/spec/lti-ags/scope/score" {
 		t.Fatalf("unexpected scope: %s", payload.Scope)
 	}
 	if payload.LtiToolConfiguration.Domain != "tool.example.com" {
@@ -105,7 +114,29 @@ func TestBuildToolRegistrationPayload(t *testing.T) {
 	if payload.LtiToolConfiguration.TargetLinkURI != "https://tool.example.com/lti/launch" {
 		t.Fatalf("unexpected target_link_uri: %s", payload.LtiToolConfiguration.TargetLinkURI)
 	}
-	if len(payload.LtiToolConfiguration.Messages) != 1 || payload.LtiToolConfiguration.Messages[0].Type != "LtiResourceLinkRequest" {
+	if len(payload.LtiToolConfiguration.Messages) != 2 || payload.LtiToolConfiguration.Messages[0].Type != "LtiResourceLinkRequest" || payload.LtiToolConfiguration.Messages[1].Type != "LtiDeepLinkingRequest" {
 		t.Fatalf("unexpected messages: %#v", payload.LtiToolConfiguration.Messages)
+	}
+	if len(payload.LtiToolConfiguration.Claims) != 2 || payload.LtiToolConfiguration.Claims[0] != "sub" || payload.LtiToolConfiguration.Claims[1] != "https://purl.imsglobal.org/spec/lti/claim/deployment_id" {
+		t.Fatalf("unexpected claims: %#v", payload.LtiToolConfiguration.Claims)
+	}
+}
+
+func TestBuildToolRegistrationPayloadDefaultsMessageWhenPlatformOmitsIt(t *testing.T) {
+	payload := buildToolRegistrationPayload(
+		"Demo",
+		"https://tool.example.com",
+		"https://tool.example.com/lti/launch",
+		"https://tool.example.com/oidc/login?iss=https%3A%2F%2Fplatform.example.com&reg_id=abc",
+		nil,
+		nil,
+		nil,
+	)
+
+	if len(payload.LtiToolConfiguration.Messages) != 1 || payload.LtiToolConfiguration.Messages[0].Type != "LtiResourceLinkRequest" {
+		t.Fatalf("unexpected default messages: %#v", payload.LtiToolConfiguration.Messages)
+	}
+	if payload.Scope != "openid" {
+		t.Fatalf("unexpected default scope: %s", payload.Scope)
 	}
 }

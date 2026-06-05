@@ -44,6 +44,17 @@ services:
 
   ngrok:
     image: ngrok/ngrok:latest
+    profiles:
+      - tunnel
+    extra_hosts:
+      # Workaround for environments where DNS intermittently blocks ngrok-agent domains.
+      - "crl.ngrok-agent.com:18.164.124.24"
+      - "update.ngrok-agent.com:3.146.191.207"
+      - "connect.us.ngrok-agent.com:3.133.228.214"
+      # If your tunnel domain is also blocked by corporate DNS, add its IP here.
+      # Find the IP from a non-filtered network (e.g. mobile hotspot): nslookup li2026.ngrok.io 8.8.8.8
+      # Then uncomment and set the correct IP:
+      # - "${NGROK_DOMAIN:-li2026}.ngrok.io:<tunnel-ip>"
     command:
       - "http"
       - "--url"

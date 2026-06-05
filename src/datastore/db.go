@@ -2,19 +2,32 @@ package datastore
 
 import (
 	"1edtech/ap-demo/utils"
+	"crypto/rand"
 	"crypto/rsa"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"crypto/x509"
+
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
+
+// Ping checks the database connection and returns an error if it is unavailable.
+func Ping() error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.Ping()
+}
 
 type IRegistrationQueries interface {
 	GetRegistration(i string, r string) (*ToolRegistration, error)
@@ -88,6 +101,13 @@ type RegistrationSummary struct {
 	CustomerID     string
 }
 
+type generatedKeyMaterial struct {
+	KeySetID   string
+	KeyID      string
+	PrivateKey string
+	Alg        string
+}
+
 func DBInit() {
 	fmt.Println("Connecting to db...")
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
@@ -108,9 +128,85 @@ func DBInit() {
 	if err != nil {
 		log.Fatal("Failed to ping to database")
 	}
+	if err := ensureSigningKeyMaterial(); err != nil {
+		log.Fatalf("Failed to initialize signing keys: %v", err)
+	}
 	fmt.Println("Connected to db...")
 	RegistrationQueries = defaultRegistrationQueries{}
 	AssetReportQueries = defaultAssetReportQueries{}
+}
+
+func ensureSigningKeyMaterial() error {
+	row := db.QueryRow(`SELECT COUNT(*) FROM a_key`)
+	var keyCount int
+	if err := row.Scan(&keyCount); err != nil {
+		return err
+	}
+	if keyCount > 0 {
+		return nil
+	}
+
+	material, err := generateSigningKeyMaterial()
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`INSERT INTO key_set (id) VALUES ($1)`, material.KeySetID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`INSERT INTO a_key (
+		id,
+		key_set_id,
+		private_key,
+		alg
+	) VALUES ($1, $2, $3, $4)`, material.KeyID, material.KeySetID, material.PrivateKey, material.Alg)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	log.Print("Generated default signing key material")
+	return nil
+}
+
+func generateSigningKeyMaterial() (*generatedKeyMaterial, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyBytes})
+	if len(privateKeyPEM) == 0 {
+		return nil, fmt.Errorf("failed to encode private key")
+	}
+
+	return &generatedKeyMaterial{
+		KeySetID:   uuid.New().String(),
+		KeyID:      uuid.New().String(),
+		PrivateKey: string(privateKeyPEM),
+		Alg:        "RS256",
+	}, nil
 }
 
 func (defaultRegistrationQueries) GetRegistration(i string, r string) (*ToolRegistration, error) {

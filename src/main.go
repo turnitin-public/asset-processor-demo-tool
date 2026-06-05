@@ -7,14 +7,75 @@ import (
 	"1edtech/ap-demo/ltinotices"
 	"1edtech/ap-demo/oidc"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
+
+func requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("new request: method=%s path=%s remote=%s", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	type serviceStatus struct {
+		Status string `json:"status"`
+		Error  string `json:"error,omitempty"`
+	}
+	type healthResponse struct {
+		Status   string                   `json:"status"`
+		Services map[string]serviceStatus `json:"services"`
+	}
+
+	services := map[string]serviceStatus{}
+	overall := "ok"
+
+	// Check database
+	if err := datastore.Ping(); err != nil {
+		services["database"] = serviceStatus{Status: "unavailable", Error: err.Error()}
+		overall = "degraded"
+	} else {
+		services["database"] = serviceStatus{Status: "ok"}
+	}
+
+	// Check LLM server
+	llmURL := os.Getenv("LLM_SERVER_URL")
+	if llmURL == "" {
+		services["llm"] = serviceStatus{Status: "unconfigured"}
+	} else {
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Get(llmURL + "/health")
+		if err != nil {
+			services["llm"] = serviceStatus{Status: "unavailable", Error: err.Error()}
+			overall = "degraded"
+		} else {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				services["llm"] = serviceStatus{Status: "ok"}
+			} else {
+				services["llm"] = serviceStatus{Status: "unavailable", Error: resp.Status}
+				overall = "degraded"
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if overall != "ok" {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	json.NewEncoder(w).Encode(healthResponse{Status: overall, Services: services})
+}
 
 func main() {
 	mux := http.NewServeMux()
+	// Health check
+	mux.Handle("/health", http.HandlerFunc(healthHandler))
+
 	// OIDC Login
 	mux.Handle("/oidc/login", http.HandlerFunc(oidc.Login))
 
@@ -60,7 +121,7 @@ func main() {
 		WriteTimeout:      0,
 		IdleTimeout:       0,
 		ReadHeaderTimeout: 0,
-		Handler:           mux,
+		Handler:           requestLogger(mux),
 	}
 	// Start server
 	fmt.Println("Starting...")

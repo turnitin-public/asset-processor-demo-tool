@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,6 +30,9 @@ type platformOpenIDConfiguration struct {
 	RegistrationEndpoint  string  `json:"registration_endpoint"`
 	JWKSURI               string  `json:"jwks_uri"`
 	TokenEndpoint         string  `json:"token_endpoint"`
+	ScopesSupported       []string                `json:"scopes_supported"`
+	ClaimsSupported       []string                `json:"claims_supported"`
+	MessagesSupported     []toolMessageDefinition `json:"messages_supported"`
 	AuthorizationServer   *string `json:"authorization_server"`
 }
 
@@ -56,7 +60,7 @@ func Initiate(w http.ResponseWriter, r *http.Request) {
     <h2>LTI Dynamic Registration</h2>
     <form method="post" action="/lti-dr/register">
       <label>OpenID Configuration URL</label><br/>
-      <input type="url" name="openid_configuration" value="%s" required style="width:600px" /><br/><br/>
+	<input type="url" name="openid_configuration" value="%s" required style="width:100%%" /><br/><br/>
       <label>Registration Token (optional)</label><br/>
       <input type="text" name="registration_token" value="%s" style="width:600px" /><br/><br/>
       <label>Customer ID</label><br/>
@@ -68,51 +72,77 @@ func Initiate(w http.ResponseWriter, r *http.Request) {
 }
 
 func Register(w http.ResponseWriter, r *http.Request) {
+	log.Printf("dynamic registration: start method=%s path=%s", r.Method, r.URL.Path)
+
 	errs := utils.JsonErrors{Errors: []utils.JsonError{}, Code: 400}
+	log.Print("dynamic registration: parsing request payload")
 	payload, ok := parseRegistrationRequest(r, &errs)
 	if !ok {
+		log.Print("dynamic registration: failed to parse request payload")
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Printf("dynamic registration: request payload=%+v", payload)
+	log.Printf("dynamic registration: request parsed openid_configuration=%s customer_id=%s has_registration_token=%t", payload.OpenIDConfiguration, payload.CustomerID, payload.RegistrationToken != "")
 
+	log.Print("dynamic registration: fetching platform openid configuration")
 	platformConfig, ok := fetchPlatformOpenIDConfiguration(payload.OpenIDConfiguration, &errs)
 	if !ok {
+		log.Print("dynamic registration: failed to fetch platform openid configuration")
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Printf("dynamic registration: platform config=%+v", platformConfig)
+	log.Printf("dynamic registration: fetched platform configuration issuer=%s registration_endpoint=%s", platformConfig.Issuer, platformConfig.RegistrationEndpoint)
 
+	log.Print("dynamic registration: validating platform openid configuration")
 	if err := validatePlatformConfiguration(payload.OpenIDConfiguration, platformConfig); err != nil {
+		log.Printf("dynamic registration: platform configuration validation failed: %v", err)
 		utils.AddError(&errs, err.Error(), err)
 		errs.Code = 400
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Print("dynamic registration: platform openid configuration validation succeeded")
 
+	log.Print("dynamic registration: generating registration and deployment identifiers")
 	registrationID := uuid.New().String()
 	deploymentID := uuid.New().String()
 	toolBaseURL := resolveToolBaseURL(r)
 	toolRedirectURI := toolBaseURL + "/lti/launch"
 	initiateLoginURI := buildLoginURL(toolBaseURL, platformConfig.Issuer, registrationID)
+	log.Printf("dynamic registration: generated identifiers registration_id=%s deployment_id=%s", registrationID, deploymentID)
+	log.Printf("dynamic registration: resolved tool urls base=%s launch=%s login=%s", toolBaseURL, toolRedirectURI, initiateLoginURI)
 
+	log.Print("dynamic registration: sending registration request to platform")
 	clientID, ok := registerOnPlatform(platformConfig, payload.RegistrationToken, payload.CustomerID, toolBaseURL, toolRedirectURI, initiateLoginURI, &errs)
 	if !ok {
+		log.Print("dynamic registration: platform registration request failed")
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Printf("dynamic registration: platform registration succeeded client_id=%s", clientID)
 
+	log.Print("dynamic registration: loading default key set id")
 	keySetID, err := datastore.RegistrationQueries.GetDefaultKeySetID()
 	if err != nil {
+		log.Printf("dynamic registration: unable to load default key set id: %v", err)
 		utils.AddError(&errs, "unable to find key set for new registration", err)
 		errs.Code = 500
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Printf("dynamic registration: loaded key set id=%s", keySetID)
 
+	log.Print("dynamic registration: resolving customer id for persistence")
 	customerID := payload.CustomerID
 	if strings.TrimSpace(customerID) == "" {
+		log.Printf("dynamic registration: customer id not provided, falling back to issuer=%s", platformConfig.Issuer)
 		customerID = platformConfig.Issuer
 	}
+	log.Printf("dynamic registration: using customer id=%s", customerID)
 
+	log.Print("dynamic registration: storing registration and deployment")
 	err = datastore.RegistrationQueries.CreateRegistrationAndDeployment(datastore.DynamicRegistrationInsert{
 		RegistrationID:              registrationID,
 		DeploymentID:                deploymentID,
@@ -127,11 +157,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		CustomerID:                  customerID,
 	})
 	if err != nil {
+		log.Printf("dynamic registration: unable to store registration: %v", err)
 		utils.AddError(&errs, "unable to store registration", err)
 		errs.Code = 500
 		utils.WriteJsonError(w, r, errs)
 		return
 	}
+	log.Print("dynamic registration: registration and deployment stored successfully")
 
 	result := map[string]string{
 		"registration_id": registrationID,
@@ -141,15 +173,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		"login_url":       initiateLoginURI,
 		"launch_url":      toolRedirectURI,
 	}
+	log.Print("dynamic registration: building success response payload")
 
 	if isJSONRequest(r) {
+		log.Print("dynamic registration: responding with JSON")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(201)
 		_ = json.NewEncoder(w).Encode(result)
+		log.Printf("dynamic registration: complete registration_id=%s deployment_id=%s", registrationID, deploymentID)
 		return
 	}
 
+	log.Print("dynamic registration: responding with HTML completion page")
 	renderRegistrationComplete(w, result)
+	log.Printf("dynamic registration: complete registration_id=%s deployment_id=%s", registrationID, deploymentID)
 }
 
 func parseRegistrationRequest(r *http.Request, errs *utils.JsonErrors) (registrationRequest, bool) {
@@ -195,6 +232,7 @@ func fetchPlatformOpenIDConfiguration(openIDConfigurationURL string, errs *utils
 	}
 
 	resp, err := utils.HttpClient().Do(req)
+	log.Printf("%+v", resp)
 	if err != nil {
 		utils.AddError(errs, "unable to fetch openid configuration", err)
 		errs.Code = 400
@@ -233,7 +271,7 @@ func registerOnPlatform(
 	initiateLoginURI string,
 	errs *utils.JsonErrors,
 ) (string, bool) {
-	registrationPayload := buildToolRegistrationPayload(customerID, toolBaseURL, toolRedirectURI, initiateLoginURI)
+	registrationPayload := buildToolRegistrationPayload(customerID, toolBaseURL, toolRedirectURI, initiateLoginURI, platformConfig.ClaimsSupported, platformConfig.MessagesSupported, platformConfig.ScopesSupported)
 
 	body, err := json.Marshal(registrationPayload)
 	if err != nil {
