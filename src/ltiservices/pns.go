@@ -22,7 +22,7 @@ func RegisterSubmissionNotice(issuer string, clientId string, deploymentId strin
 		Handler    string `json:"handler"`
 	}{
 		NoticeType: "LtiAssetProcessorSubmissionNotice",
-		Handler:    "https://lti-ap-demo.ngrok.io/lti/notice",
+		Handler:    "https://li2026.ngrok.io/lti/notice",
 	}
 	b, err := json.Marshal(pnsRequest)
 	if err != nil {

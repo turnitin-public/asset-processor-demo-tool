@@ -2,6 +2,7 @@ package main
 
 import (
 	"1edtech/ap-demo/datastore"
+	"1edtech/ap-demo/ltidr"
 	"1edtech/ap-demo/ltimessages"
 	"1edtech/ap-demo/ltinotices"
 	"1edtech/ap-demo/oidc"
@@ -28,6 +29,12 @@ func main() {
 
 	// Deep Linking Response
 	mux.Handle("/lti/deeplink/return", http.HandlerFunc(ltimessages.DeepLinkingResponse))
+
+	// LTI Dynamic Registration
+	mux.Handle("/lti-dr/initiate", http.HandlerFunc(ltidr.Initiate))
+	mux.Handle("/lti-dr/register", http.HandlerFunc(ltidr.Register))
+	mux.Handle("/admin/registrations", http.HandlerFunc(ltidr.Registrations))
+	mux.Handle("/admin/registrations/delete", http.HandlerFunc(ltidr.DeleteRegistration))
 
 	// http call Test
 	mux.Handle("/client", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

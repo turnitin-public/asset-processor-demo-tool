@@ -21,6 +21,10 @@ type IRegistrationQueries interface {
 	GetRegistrationByClient(i string, c string) (*ToolRegistration, error)
 	GetPrivateKeyAndRegForClient(i string, c string, errs *utils.JsonErrors) (*rsa.PrivateKey, *RegistrationWithKey, bool)
 	GetAllKeys() ([]Key, error)
+	GetDefaultKeySetID() (string, error)
+	CreateRegistrationAndDeployment(reg DynamicRegistrationInsert) error
+	ListRegistrations() ([]RegistrationSummary, error)
+	DeleteRegistration(registrationID string) error
 }
 
 var RegistrationQueries IRegistrationQueries
@@ -62,6 +66,28 @@ type RegistrationWithKey struct {
 	Key
 }
 
+type DynamicRegistrationInsert struct {
+	RegistrationID              string
+	DeploymentID                string
+	Issuer                      string
+	ClientID                    string
+	PlatformLoginAuthEndpoint   string
+	PlatformServiceAuthEndpoint string
+	PlatformJwksEndpoint        string
+	PlatformAuthProvider        *string
+	ToolRedirectURI             string
+	KeySetID                    string
+	CustomerID                  string
+}
+
+type RegistrationSummary struct {
+	RegistrationID string
+	Issuer         string
+	ClientID       string
+	DeploymentID   string
+	CustomerID     string
+}
+
 func DBInit() {
 	fmt.Println("Connecting to db...")
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
@@ -88,6 +114,7 @@ func DBInit() {
 }
 
 func (defaultRegistrationQueries) GetRegistration(i string, r string) (*ToolRegistration, error) {
+	log.Printf("GetRegistration called with issuer=%s, id=%s", i, r)
 	row := db.QueryRow(`SELECT
 		id,
 		issuer,
@@ -201,6 +228,130 @@ func (defaultRegistrationQueries) GetAllKeys() ([]Key, error) {
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func (defaultRegistrationQueries) GetDefaultKeySetID() (string, error) {
+	row := db.QueryRow(`SELECT key_set_id
+	FROM a_key
+	ORDER BY created DESC
+	LIMIT 1`)
+	var keySetID string
+	if err := row.Scan(&keySetID); err != nil {
+		return "", err
+	}
+	return keySetID, nil
+}
+
+func (defaultRegistrationQueries) CreateRegistrationAndDeployment(reg DynamicRegistrationInsert) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`INSERT INTO registration (
+		id,
+		issuer,
+		client_id,
+		platform_login_auth_endpoint,
+		platform_service_auth_endpoint,
+		platform_jwks_endpoint,
+		platform_auth_provider,
+		tool_redirect_uri,
+		key_set_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		reg.RegistrationID,
+		reg.Issuer,
+		reg.ClientID,
+		reg.PlatformLoginAuthEndpoint,
+		reg.PlatformServiceAuthEndpoint,
+		reg.PlatformJwksEndpoint,
+		reg.PlatformAuthProvider,
+		reg.ToolRedirectURI,
+		reg.KeySetID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`INSERT INTO deployment (
+		deployment_id,
+		registration_id,
+		customer_id
+	) VALUES ($1, $2, $3)`, reg.DeploymentID, reg.RegistrationID, reg.CustomerID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (defaultRegistrationQueries) ListRegistrations() ([]RegistrationSummary, error) {
+	rows, err := db.Query(`SELECT
+		r.id,
+		r.issuer,
+		r.client_id,
+		d.deployment_id,
+		d.customer_id
+	FROM registration r
+	LEFT JOIN deployment d ON d.registration_id = r.id
+	ORDER BY r.issuer ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	registrations := make([]RegistrationSummary, 0)
+	for rows.Next() {
+		var summary RegistrationSummary
+		if err := rows.Scan(&summary.RegistrationID, &summary.Issuer, &summary.ClientID, &summary.DeploymentID, &summary.CustomerID); err != nil {
+			return nil, err
+		}
+		registrations = append(registrations, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return registrations, nil
+}
+
+func (defaultRegistrationQueries) DeleteRegistration(registrationID string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`DELETE FROM deployment WHERE registration_id = $1`, registrationID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM registration WHERE id = $1`, registrationID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (defaultAssetReportQueries) SaveAssetReport(id string, registrationId string, deploymentId string, assetId string, assetType string, content string) bool {
