@@ -4,8 +4,11 @@ import (
 	"1edtech/ap-demo/datastore"
 	"1edtech/ap-demo/ltiservices"
 	"1edtech/ap-demo/utils"
+	"fmt"
 	"html/template"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -15,7 +18,8 @@ import (
 func deepLinkingRequest(w http.ResponseWriter, r *http.Request, claims *LtiMessage) utils.JsonErrors {
 	// Register for submission notices
 	var errs = utils.JsonErrors{Errors: make([]utils.JsonError, 0), Code: 200}
-	ltiservices.RegisterSubmissionNotice(claims.Issuer, claims.Audience, claims.DeploymentId, claims.Pns.ServiceUrl, []string{"https://purl.imsglobal.org/spec/lti/scope/noticehandlers"}, &errs)
+	toolBaseURL := resolveToolBaseURL(r)
+	ltiservices.RegisterSubmissionNotice(claims.Issuer, claims.Audience, claims.DeploymentId, claims.Pns.ServiceUrl, toolBaseURL, []string{"https://purl.imsglobal.org/spec/lti/scope/noticehandlers"}, &errs)
 	if len(errs.Errors) > 0 {
 		return errs
 	}
@@ -61,6 +65,22 @@ func deepLinkingRequest(w http.ResponseWriter, r *http.Request, claims *LtiMessa
 	}
 
 	return errs
+}
+
+func resolveToolBaseURL(r *http.Request) string {
+	if configured := strings.TrimSpace(os.Getenv("TOOL_BASE_URL")); configured != "" {
+		return strings.TrimSuffix(configured, "/")
+	}
+
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+		scheme = forwarded
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, r.Host)
 }
 
 func DeepLinkingResponse(w http.ResponseWriter, r *http.Request) {
