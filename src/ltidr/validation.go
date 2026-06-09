@@ -37,6 +37,10 @@ func validatePlatformConfiguration(openIDConfigurationURL string, config *platfo
 	return nil
 }
 
+func ValidatePlatformConfiguration(openIDConfigurationURL string, config *PlatformOpenIDConfiguration) error {
+	return validatePlatformConfiguration(openIDConfigurationURL, config)
+}
+
 func validateIssuerURL(rawIssuer string) (*url.URL, error) {
 	issuerURL, err := url.Parse(rawIssuer)
 	if err != nil {

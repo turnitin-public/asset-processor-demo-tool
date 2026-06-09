@@ -108,6 +108,8 @@ type generatedKeyMaterial struct {
 	Alg        string
 }
 
+type GeneratedKeyMaterial = generatedKeyMaterial
+
 func DBInit() {
 	fmt.Println("Connecting to db...")
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
@@ -116,17 +118,14 @@ func DBInit() {
 	}
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", os.Getenv("DB_HOST"), port, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
 
-	// open database
+	// Open the database handle once, then wait for Postgres to accept connections.
 	db, err = sql.Open("postgres", psqlconn)
 	if err != nil {
-		// Sleep for 10 seconds and try again
-		log.Printf("Failed to connect to database: %v", err)
-		time.Sleep(10 * time.Second)
-		DBInit() // Retry initialization
+		log.Fatalf("Failed to open database: %v", err)
 	}
-	err = db.Ping()
-	if err != nil {
-		log.Fatal("Failed to ping to database")
+
+	if err := waitForDatabase(60 * time.Second); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	if err := ensureSigningKeyMaterial(); err != nil {
 		log.Fatalf("Failed to initialize signing keys: %v", err)
@@ -134,6 +133,19 @@ func DBInit() {
 	fmt.Println("Connected to db...")
 	RegistrationQueries = defaultRegistrationQueries{}
 	AssetReportQueries = defaultAssetReportQueries{}
+}
+
+func waitForDatabase(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if err := db.Ping(); err == nil {
+			return nil
+		} else if time.Now().After(deadline) {
+			return err
+		}
+
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func ensureSigningKeyMaterial() error {
@@ -207,6 +219,10 @@ func generateSigningKeyMaterial() (*generatedKeyMaterial, error) {
 		PrivateKey: string(privateKeyPEM),
 		Alg:        "RS256",
 	}, nil
+}
+
+func GenerateSigningKeyMaterial() (*GeneratedKeyMaterial, error) {
+	return generateSigningKeyMaterial()
 }
 
 func (defaultRegistrationQueries) GetRegistration(i string, r string) (*ToolRegistration, error) {

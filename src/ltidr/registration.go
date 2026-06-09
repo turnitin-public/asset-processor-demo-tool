@@ -40,6 +40,11 @@ type platformRegistrationResponse struct {
 	ClientID string `json:"client_id"`
 }
 
+type PlatformOpenIDConfiguration = platformOpenIDConfiguration
+type ToolMessageDefinition = toolMessageDefinition
+type ToolRegistrationPayload = toolRegistrationPayload
+type ToolConfigurationPayload = toolConfigurationPayload
+
 func Initiate(w http.ResponseWriter, r *http.Request) {
 	openidConfiguration := html.EscapeString(r.URL.Query().Get("openid_configuration"))
 	registrationToken := html.EscapeString(r.URL.Query().Get("registration_token"))

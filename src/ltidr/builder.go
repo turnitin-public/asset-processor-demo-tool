@@ -55,6 +55,10 @@ func buildToolRegistrationPayload(customerID string, toolBaseURL string, toolRed
 	}
 }
 
+func BuildToolRegistrationPayload(customerID string, toolBaseURL string, toolRedirectURI string, initiateLoginURI string, supportedClaims []string, supportedMessages []ToolMessageDefinition, supportedScopes []string) ToolRegistrationPayload {
+	return buildToolRegistrationPayload(customerID, toolBaseURL, toolRedirectURI, initiateLoginURI, supportedClaims, supportedMessages, supportedScopes)
+}
+
 func resolveScope(supportedScopes []string) string {
 	if len(supportedScopes) == 0 {
 		return "openid"
