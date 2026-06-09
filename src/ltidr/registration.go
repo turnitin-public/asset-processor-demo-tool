@@ -110,7 +110,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	deploymentID := uuid.New().String()
 	toolBaseURL := resolveToolBaseURL(r)
 	toolRedirectURI := toolBaseURL + "/lti/launch"
-	initiateLoginURI := buildLoginURL(toolBaseURL, platformConfig.Issuer, registrationID)
+	initiateLoginURI := buildLoginURL(toolBaseURL, registrationID)
 	log.Printf("dynamic registration: generated identifiers registration_id=%s deployment_id=%s", registrationID, deploymentID)
 	log.Printf("dynamic registration: resolved tool urls base=%s launch=%s login=%s", toolBaseURL, toolRedirectURI, initiateLoginURI)
 
@@ -365,9 +365,8 @@ func appendQueryValue(rawURL string, key string, value string) string {
 	return u.String()
 }
 
-func buildLoginURL(toolBaseURL string, issuer string, registrationID string) string {
-	loginURL := appendQueryValue(toolBaseURL+"/oidc/login", "iss", issuer)
-	return appendQueryValue(loginURL, "reg_id", registrationID)
+func buildLoginURL(toolBaseURL string, registrationID string) string {
+	return appendQueryValue(toolBaseURL+"/oidc/login", "reg_id", registrationID)
 }
 
 func isJSONRequest(r *http.Request) bool {
