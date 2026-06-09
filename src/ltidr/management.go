@@ -34,7 +34,7 @@ func Registrations(w http.ResponseWriter, r *http.Request) {
 			ClientID:       registration.ClientID,
 			DeploymentID:   registration.DeploymentID,
 			CustomerID:     registration.CustomerID,
-			LoginURL:       buildLoginURL(toolBaseURL, registration.Issuer, registration.RegistrationID),
+			LoginURL:       buildLoginURL(toolBaseURL, registration.RegistrationID),
 		})
 	}
 
