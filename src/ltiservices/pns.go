@@ -7,9 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
-func RegisterSubmissionNotice(issuer string, clientId string, deploymentId string, serviceUrl string, scopes []string, errs *utils.JsonErrors) bool {
+func RegisterSubmissionNotice(issuer string, clientId string, deploymentId string, serviceUrl string, toolBaseURL string, scopes []string, errs *utils.JsonErrors) bool {
 	// Register submission notice
 
 	// Get service token
@@ -22,7 +23,7 @@ func RegisterSubmissionNotice(issuer string, clientId string, deploymentId strin
 		Handler    string `json:"handler"`
 	}{
 		NoticeType: "LtiAssetProcessorSubmissionNotice",
-		Handler:    "https://li2026.ngrok.io/lti/notice",
+		Handler:    strings.TrimSuffix(toolBaseURL, "/") + "/lti/notice",
 	}
 	b, err := json.Marshal(pnsRequest)
 	if err != nil {
