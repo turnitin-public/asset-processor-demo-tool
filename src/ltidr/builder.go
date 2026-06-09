@@ -23,13 +23,17 @@ type toolConfigurationPayload struct {
 }
 
 type toolMessageDefinition struct {
-	Type string `json:"type"`
+	Type       string   `json:"type"`
+	Placements []string `json:"placements,omitempty"`
 }
 
 func buildToolRegistrationPayload(customerID string, toolBaseURL string, toolRedirectURI string, initiateLoginURI string, supportedClaims []string, supportedMessages []toolMessageDefinition, supportedScopes []string) toolRegistrationPayload {
 	messages := supportedMessages
 	if len(messages) == 0 {
-		messages = []toolMessageDefinition{{Type: "LtiResourceLinkRequest"}}
+		messages = []toolMessageDefinition{
+			{Type: "LtiResourceLinkRequest"},
+			{Type: "LtiDeepLinkingRequest", Placements: []string{"ActivityAssetProcessor"}},
+		}
 	}
 
 	return toolRegistrationPayload{
