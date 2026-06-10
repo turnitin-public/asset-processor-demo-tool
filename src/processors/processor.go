@@ -33,6 +33,10 @@ type IProcessor interface {
 
 var processors []IProcessor
 
+func SetProcessorsForTest(testProcessors []IProcessor) {
+	processors = testProcessors
+}
+
 func FilterAssets(assets []ltiservices.Asset, errs *utils.JsonErrors) ([]ltiservices.Asset, []ltiservices.Report) {
 	filteredAssets := make([]ltiservices.Asset, 0)
 	reports := make([]ltiservices.Report, 0)

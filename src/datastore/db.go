@@ -2,25 +2,42 @@ package datastore
 
 import (
 	"1edtech/ap-demo/utils"
+	"crypto/rand"
 	"crypto/rsa"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
+	"crypto/x509"
+
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
+
+// Ping checks the database connection and returns an error if it is unavailable.
+func Ping() error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.Ping()
+}
 
 type IRegistrationQueries interface {
 	GetRegistration(i string, r string) (*ToolRegistration, error)
 	GetRegistrationByClient(i string, c string) (*ToolRegistration, error)
 	GetPrivateKeyAndRegForClient(i string, c string, errs *utils.JsonErrors) (*rsa.PrivateKey, *RegistrationWithKey, bool)
 	GetAllKeys() ([]Key, error)
+	GetDefaultKeySetID() (string, error)
+	CreateRegistrationAndDeployment(reg DynamicRegistrationInsert) error
+	ListRegistrations() ([]RegistrationSummary, error)
+	DeleteRegistration(registrationID string) error
 }
 
 var RegistrationQueries IRegistrationQueries
@@ -62,6 +79,37 @@ type RegistrationWithKey struct {
 	Key
 }
 
+type DynamicRegistrationInsert struct {
+	RegistrationID              string
+	DeploymentID                string
+	Issuer                      string
+	ClientID                    string
+	PlatformLoginAuthEndpoint   string
+	PlatformServiceAuthEndpoint string
+	PlatformJwksEndpoint        string
+	PlatformAuthProvider        *string
+	ToolRedirectURI             string
+	KeySetID                    string
+	CustomerID                  string
+}
+
+type RegistrationSummary struct {
+	RegistrationID string
+	Issuer         string
+	ClientID       string
+	DeploymentID   string
+	CustomerID     string
+}
+
+type generatedKeyMaterial struct {
+	KeySetID   string
+	KeyID      string
+	PrivateKey string
+	Alg        string
+}
+
+type GeneratedKeyMaterial = generatedKeyMaterial
+
 func DBInit() {
 	fmt.Println("Connecting to db...")
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
@@ -70,24 +118,115 @@ func DBInit() {
 	}
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", os.Getenv("DB_HOST"), port, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
 
-	// open database
+	// Open the database handle once, then wait for Postgres to accept connections.
 	db, err = sql.Open("postgres", psqlconn)
 	if err != nil {
-		// Sleep for 10 seconds and try again
-		log.Printf("Failed to connect to database: %v", err)
-		time.Sleep(10 * time.Second)
-		DBInit() // Retry initialization
+		log.Fatalf("Failed to open database: %v", err)
 	}
-	err = db.Ping()
-	if err != nil {
-		log.Fatal("Failed to ping to database")
+
+	if err := waitForDatabase(60 * time.Second); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	if err := ensureSigningKeyMaterial(); err != nil {
+		log.Fatalf("Failed to initialize signing keys: %v", err)
 	}
 	fmt.Println("Connected to db...")
 	RegistrationQueries = defaultRegistrationQueries{}
 	AssetReportQueries = defaultAssetReportQueries{}
 }
 
+func waitForDatabase(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if err := db.Ping(); err == nil {
+			return nil
+		} else if time.Now().After(deadline) {
+			return err
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func ensureSigningKeyMaterial() error {
+	row := db.QueryRow(`SELECT COUNT(*) FROM a_key`)
+	var keyCount int
+	if err := row.Scan(&keyCount); err != nil {
+		return err
+	}
+	if keyCount > 0 {
+		return nil
+	}
+
+	material, err := generateSigningKeyMaterial()
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`INSERT INTO key_set (id) VALUES ($1)`, material.KeySetID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`INSERT INTO a_key (
+		id,
+		key_set_id,
+		private_key,
+		alg
+	) VALUES ($1, $2, $3, $4)`, material.KeyID, material.KeySetID, material.PrivateKey, material.Alg)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	log.Print("Generated default signing key material")
+	return nil
+}
+
+func generateSigningKeyMaterial() (*generatedKeyMaterial, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyBytes})
+	if len(privateKeyPEM) == 0 {
+		return nil, fmt.Errorf("failed to encode private key")
+	}
+
+	return &generatedKeyMaterial{
+		KeySetID:   uuid.New().String(),
+		KeyID:      uuid.New().String(),
+		PrivateKey: string(privateKeyPEM),
+		Alg:        "RS256",
+	}, nil
+}
+
+func GenerateSigningKeyMaterial() (*GeneratedKeyMaterial, error) {
+	return generateSigningKeyMaterial()
+}
+
 func (defaultRegistrationQueries) GetRegistration(i string, r string) (*ToolRegistration, error) {
+	log.Printf("GetRegistration called with issuer=%s, id=%s", i, r)
 	row := db.QueryRow(`SELECT
 		id,
 		issuer,
@@ -201,6 +340,130 @@ func (defaultRegistrationQueries) GetAllKeys() ([]Key, error) {
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func (defaultRegistrationQueries) GetDefaultKeySetID() (string, error) {
+	row := db.QueryRow(`SELECT key_set_id
+	FROM a_key
+	ORDER BY created DESC
+	LIMIT 1`)
+	var keySetID string
+	if err := row.Scan(&keySetID); err != nil {
+		return "", err
+	}
+	return keySetID, nil
+}
+
+func (defaultRegistrationQueries) CreateRegistrationAndDeployment(reg DynamicRegistrationInsert) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`INSERT INTO registration (
+		id,
+		issuer,
+		client_id,
+		platform_login_auth_endpoint,
+		platform_service_auth_endpoint,
+		platform_jwks_endpoint,
+		platform_auth_provider,
+		tool_redirect_uri,
+		key_set_id
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		reg.RegistrationID,
+		reg.Issuer,
+		reg.ClientID,
+		reg.PlatformLoginAuthEndpoint,
+		reg.PlatformServiceAuthEndpoint,
+		reg.PlatformJwksEndpoint,
+		reg.PlatformAuthProvider,
+		reg.ToolRedirectURI,
+		reg.KeySetID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`INSERT INTO deployment (
+		deployment_id,
+		registration_id,
+		customer_id
+	) VALUES ($1, $2, $3)`, reg.DeploymentID, reg.RegistrationID, reg.CustomerID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (defaultRegistrationQueries) ListRegistrations() ([]RegistrationSummary, error) {
+	rows, err := db.Query(`SELECT
+		r.id,
+		r.issuer,
+		r.client_id,
+		d.deployment_id,
+		d.customer_id
+	FROM registration r
+	LEFT JOIN deployment d ON d.registration_id = r.id
+	ORDER BY r.issuer ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	registrations := make([]RegistrationSummary, 0)
+	for rows.Next() {
+		var summary RegistrationSummary
+		if err := rows.Scan(&summary.RegistrationID, &summary.Issuer, &summary.ClientID, &summary.DeploymentID, &summary.CustomerID); err != nil {
+			return nil, err
+		}
+		registrations = append(registrations, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return registrations, nil
+}
+
+func (defaultRegistrationQueries) DeleteRegistration(registrationID string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.Exec(`DELETE FROM deployment WHERE registration_id = $1`, registrationID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM registration WHERE id = $1`, registrationID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (defaultAssetReportQueries) SaveAssetReport(id string, registrationId string, deploymentId string, assetId string, assetType string, content string) bool {
